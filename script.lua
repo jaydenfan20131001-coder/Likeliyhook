@@ -1,7 +1,3 @@
-
--- DEATH HUB V4.7 - Full Fixed Version
--- =============================================
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -119,7 +115,9 @@ enterBtn.MouseButton1Click:Connect(function()
             iterationCount = 32,
             voidStabilizer = false, positionResolver = false,
             predictiveSync = false, failsafeRecovery = false, positionRestore = false,
-            orbitSpeed = 12, orbitRadius = 18
+            orbitSpeed = 12, orbitRadius = 18,
+            darkTextureActive = false,
+            resolutionScreenerActive = false
         }
 
         local connections = {}
@@ -140,6 +138,70 @@ enterBtn.MouseButton1Click:Connect(function()
             fakePosition = nil
             lastGoodPosition = nil
         end)
+
+        -- ==================== DARK TEXTURE FUNCTION (from dark.txt) ====================
+        local function isMapPart(part)
+            if not part:IsA("BasePart") then return false end
+            if part:FindFirstAncestorOfClass("Tool") then return false end
+            local parentModel = part:FindFirstAncestorOfClass("Model")
+            if parentModel and parentModel:FindFirstChildOfClass("Humanoid") then return false end
+            if part:FindFirstChildWhichIsA("SpecialMesh") or part:FindFirstChildWhichIsA("MeshPart") then return false end
+            if part.Size.Magnitude < 5 then return false end
+            if part.Material == Enum.Material.Grass or (part.Name:lower():find("tree")) then return false end
+            if not part.Anchored then return false end
+            return true
+        end
+
+        local function applyCharcoal()
+            for _, part in pairs(workspace:GetDescendants()) do
+                if isMapPart(part) then
+                    part.Color = Color3.fromRGB(50, 50, 50)
+                    part.Material = Enum.Material.SmoothPlastic
+                end
+            end
+        end
+
+        local function toggleDarkTexture(state)
+            config.darkTextureActive = state
+            if state then
+                applyCharcoal()
+                -- Re-apply on new parts spawning
+                connections.darkTexture = workspace.DescendantAdded:Connect(function(part)
+                    if isMapPart(part) then
+                        part.Color = Color3.fromRGB(50, 50, 50)
+                        part.Material = Enum.Material.SmoothPlastic
+                    end
+                end)
+            else
+                if connections.darkTexture then
+                    connections.darkTexture:Disconnect()
+                end
+            end
+        end
+
+        -- ==================== RESOLUTION SCREENER ====================
+        getgenv().Resolution = getgenv().Resolution or {}
+        getgenv().Resolution[".gg/scripters"] = 0.81
+
+        local Camera = workspace.CurrentCamera
+        local resolutionConnection
+
+        local function toggleResolutionScreener(state)
+            config.resolutionScreenerActive = state
+            if state then
+                if not getgenv().gg_scripters then
+                    resolutionConnection = RunService.RenderStepped:Connect(function()
+                        Camera.CFrame = Camera.CFrame * CFrame.new(0, 0, 0, 1, 0, 0, 0, getgenv().Resolution[".gg/scripters"], 0, 0, 0, 1)
+                    end)
+                    getgenv().gg_scripters = "Aori0001"
+                end
+            else
+                if resolutionConnection then
+                    resolutionConnection:Disconnect()
+                    resolutionConnection = nil
+                end
+            end
+        end
 
         -- ==================== VOID + DESYNC (Xtra Void Improved) ====================
         local function UpdateDesync()
@@ -169,15 +231,12 @@ enterBtn.MouseButton1Click:Connect(function()
                     task.delay(0.009, function()
                         if HRP and fakePosition then
                             local final = fakePosition * CFrame.Angles(math.rad(config.phaseShift * (math.random() - 0.5)), 0, 0)
-                            
-                            -- Xtra Void Improvements
                             if config.voidStabilizer then
                                 final = final:Lerp(HRP.CFrame, config.syncAccuracy/100)
                             end
                             if config.predictiveSync then
                                 final = final + (velocity * 0.08)
                             end
-                            
                             HRP.CFrame = final
                         end
                     end)
@@ -200,7 +259,6 @@ enterBtn.MouseButton1Click:Connect(function()
                     task.delay(0.025, function() if HRP and fakePosition then HRP.CFrame = fakePosition end end)
                 end
 
-                -- Xtra Void Recovery
                 if config.failsafeRecovery and fakePosition and (HRP.Position - fakePosition.Position).Magnitude > 400 then
                     HRP.CFrame = fakePosition
                 end
@@ -247,11 +305,12 @@ enterBtn.MouseButton1Click:Connect(function()
             HRP.CFrame = CFrame.new(rootPos + offset, rootPos)
         end)
 
-        -- ==================== UI ====================
+        -- ==================== UI (Extra Slots Added) ====================
         local VoidTab = Window:CreateTab("Void", 4483362458)
         local XtraVoidTab = Window:CreateTab("Xtra Void", 0xFFFFFF)
         local AntiAimTab = Window:CreateTab("Anti Aim", 6026568198)
         local OrbitTab = Window:CreateTab("Orbit", 6031097228)
+        local VisualsTab = Window:CreateTab("Visuals", 0x00FF00)  -- New Extra Tab
 
         -- Void Tab (Original)
         VoidTab:CreateSection("Void Systems")
@@ -286,7 +345,26 @@ enterBtn.MouseButton1Click:Connect(function()
         OrbitTab:CreateSlider({Name = "Orbit Speed", Range = {1, 30}, Increment = 1, CurrentValue = 12, Callback = function(v) config.orbitSpeed = v end})
         OrbitTab:CreateSlider({Name = "Orbit Radius", Range = {5, 70}, Increment = 1, CurrentValue = 18, Callback = function(v) config.orbitRadius = v end})
 
-        Rayfield:Notify({Title = "Success", Content = "Xtra Void Improved - Key Original", Duration = 6})
+        -- ==================== NEW EXTRA SLOTS ====================
+        VisualsTab:CreateSection("Dark Texture")
+        VisualsTab:CreateToggle({
+            Name = "Dark Charcoal Texture",
+            CurrentValue = false,
+            Callback = function(v)
+                toggleDarkTexture(v)
+            end
+        })
+
+        VisualsTab:CreateSection("Resolution Screener")
+        VisualsTab:CreateToggle({
+            Name = "Resolution Screener (.gg/scripters)",
+            CurrentValue = false,
+            Callback = function(v)
+                toggleResolutionScreener(v)
+            end
+        })
+
+        Rayfield:Notify({Title = "Success", Content = "Xtra Void Improved + Dark Texture + Resolution Screener Added", Duration = 6})
     else
         game.StarterGui:SetCore("SendNotification", {Title = "Wrong Key", Text = "Key only from owner", Duration = 5})
     end
